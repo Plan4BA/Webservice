@@ -1,0 +1,140 @@
+package de.ddkfm.plan4ba.utils
+
+import com.mashape.unirest.http.Unirest
+import de.ddkfm.plan4ba.config
+import de.ddkfm.plan4ba.models.*
+import org.json.JSONObject
+import spark.Request
+import spark.Response
+import spark.Spark
+import spark.Spark.halt
+import java.net.URLEncoder
+import java.util.*
+
+fun login(req : Request, resp : Response) : Any? {
+    val auth = req.headers("Authorization")
+    if(auth == null || !auth.startsWith("Basic ")) {
+        resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
+        resp.status(401)
+        return "Unauthorized"
+    } else {
+        val encoded = String(Base64.getDecoder().decode(auth.replace("Basic", "").trim().toByteArray()))
+        val username = encoded.split(":")[0]
+        val password = encoded.split(":")[1]
+        try {
+            var user = (Unirest.get("${config.dbServiceEndpoint}/users?matriculationNumber=$username")
+                    .toModel(User::class.java)
+                    .second as List<User>)
+                    .firstOrNull()
+
+            if(user == null)
+                user = loginCampusDual(username, password)
+            if(user == null) {
+                resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
+                resp.status(401)
+                return "Unauthorized"
+            }
+
+            val authResp = Unirest.post("${config.dbServiceEndpoint}/users/${user?.id}/authenticate")
+                    .body(JSONObject("{ \"password\" : \"$password\"}")).asString()
+            when(authResp.status) {
+                in 400..404 -> {
+                    resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
+                    resp.status(401)
+                    return "Unauthorized"
+                }
+                200 -> {
+                    //authenticated
+                    var token = (Unirest.get("${config.dbServiceEndpoint}/tokens?userId=${user?.id}&caldavToken=false&valid=true")
+                            .toModel(Token::class.java).second as List<Token>)
+                            .firstOrNull()
+                    if(token == null) {
+                        token = Token(UUID.randomUUID().toString().replace("-", ""), user.id,
+                                false, System.currentTimeMillis() + 20 * 60 * 1000)
+                        token = (Unirest.put("${config.dbServiceEndpoint}/tokens")
+                                .body(token.toJson())
+                                .toModel(Token::class.java).second as Token)
+                        resp.type("application/json")
+                        return token.toJson()
+                    } else {
+                        resp.type("application/json")
+                        return token.toJson()
+                    }
+                }
+            }
+        } catch (e : Exception) {
+            e.printStackTrace()
+            throw e
+        }
+    }
+    return ""
+}
+
+fun loginCampusDual(username : String, password : String) : User? {
+    val (status, login) = Unirest.get("${config.loginServiceEndpoint}/login")
+            .basicAuth(username, password)
+            .toModel(Login::class.java)
+    if(status == 401 || status == 400)
+        return null
+    if(login is Login) {
+
+        var uni = (Unirest.get("${config.dbServiceEndpoint}/universities?name=${login.university.encode()}")
+                .toModel(University::class.java).second as List<University>)
+                .firstOrNull()
+        if(uni == null) {
+            uni = University(0, login.university, "", "")
+            val (status, createUni) = Unirest.put("${config.dbServiceEndpoint}/universities")
+                    .body(uni.toJson())
+                    .toModel(University::class.java)
+            when(status) {
+                200,201 -> {
+                    uni = createUni as University
+                }
+                409 -> {
+                    uni = (Unirest.get("${config.dbServiceEndpoint}/universities?name=${login.university}")
+                            .toModel(University::class.java).second as List<University>)
+                            .firstOrNull()
+                }
+                500 -> return null
+            }
+        }
+
+        var group = (Unirest.get("${config.dbServiceEndpoint}/groups?uid=${login.group}")
+                .toModel(UserGroup::class.java).second as List<UserGroup>)
+                .firstOrNull()
+        if(group == null) {
+            group = UserGroup(0, login.group, uni!!.id)
+            val (status, createGroup) = Unirest.put("${config.dbServiceEndpoint}/groups")
+                    .body(group.toJson())
+                    .toModel(UserGroup::class.java)
+            when(status) {
+                200,201 -> {
+                    group = createGroup as UserGroup
+                }
+                409 -> {
+                    group = (Unirest.get("${config.dbServiceEndpoint}/groups?uid=${login.group}")
+                            .toModel(UserGroup::class.java).second as List<UserGroup>)
+                            .firstOrNull()
+                }
+                500 -> return null
+            }
+        }
+        var user = User(0, username, login.hash, password, group!!.id, 0, 0)
+        var (status, createUser) = Unirest.put("${config.dbServiceEndpoint}/users")
+                .body(user.toJson())
+                .toModel(User::class.java)
+        when(status) {
+            200,201 -> {
+                user = createUser as User
+            }
+            409 -> {
+                user  = (Unirest.get("${config.dbServiceEndpoint}/users?matriculationNumber=$username")
+                        .toModel(User::class.java).second as List<User>)
+                        .first()
+            }
+            500 -> return null
+        }
+        return user
+    }
+    return null
+}
