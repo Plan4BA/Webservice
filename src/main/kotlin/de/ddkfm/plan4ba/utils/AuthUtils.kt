@@ -44,6 +44,8 @@ fun login(req : Request, resp : Response) : Any? {
                     return "Unauthorized"
                 }
                 200 -> {
+                    val storeHash = req.headers("StoreHash")?.toLowerCase()?.equals("true") ?: false
+                    user = modifyHash(user, storeHash, password)
                     //authenticated
                     var token = (Unirest.get("${config.dbServiceEndpoint}/tokens?userId=${user?.id}&caldavToken=false&valid=true")
                             .toModel(Token::class.java).second as List<Token>)
@@ -70,6 +72,22 @@ fun login(req : Request, resp : Response) : Any? {
     return ""
 }
 
+fun modifyHash(u : User, storeHash : Boolean, password: String) : User {
+    var user = u
+    if(user.userHash.isNullOrEmpty() xor storeHash)
+        return user
+    if(!storeHash)
+        user.userHash = ""
+    else
+        user = loginCampusDual(user.matriculationNumber, password)!!
+    val resp = Unirest.post("${config.dbServiceEndpoint}/users/${user.id}")
+            .body(user.toJson())
+            .toModel(User::class.java)
+    return when(resp.first) {
+        in 200..299 -> resp.second as User
+        else -> user
+    }
+}
 fun loginCampusDual(username : String, password : String) : User? {
     val (status, login) = Unirest.get("${config.loginServiceEndpoint}/login")
             .basicAuth(username, password)
@@ -131,6 +149,7 @@ fun loginCampusDual(username : String, password : String) : User? {
                 user  = (Unirest.get("${config.dbServiceEndpoint}/users?matriculationNumber=$username")
                         .toModel(User::class.java).second as List<User>)
                         .first()
+                user.userHash = login.hash
             }
             500 -> return null
         }
