@@ -62,3 +62,8 @@ data class Lecture(
         var userId : Int
 )
 
+data class Geo(
+        var longitude : Double,
+        var latitude : Double
+)
+

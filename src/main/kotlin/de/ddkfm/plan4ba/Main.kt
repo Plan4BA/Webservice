@@ -47,12 +47,12 @@ fun main(args : Array<String>) {
     }
     get("/login", ::login)
 
-    if(getEnvOrDefault("ENABLE_SWAGGER", "true").toBoolean()) {
+    if(getEnvOrDefault("ENABLE_SWAGGER", "false").toBoolean()) {
         var swaggerJson = SwaggerParser.getSwaggerJson("de.ddkfm.plan4ba.controller");
 
-        get("/swagger", { req, res ->
+        get("/swagger") { req, res ->
             swaggerJson
-        });
+        }
 
         get("/swagger/html") { req, resp ->
             IOUtils.copy(SwaggerParser.javaClass.getResourceAsStream("/index.html"), resp.raw().outputStream)
@@ -62,22 +62,22 @@ fun main(args : Array<String>) {
 }
 
 fun invokeFunction(controller : Class<*>, method : Method, req : Request, resp : Response) : Any {
-    val authHeader = req.headers("Authorization")?.trim()
-    if(authHeader == null || !authHeader.startsWith("Bearer"))
-        return halt(401, "Unauthorized")
-    val tokenString = authHeader.replace("Bearer", "").trim()
+    val tokenString = req.getAuthToken() ?: return halt(401, "Unauthorized")
+
     val (status, token) = Unirest.get("${config.dbServiceEndpoint}/tokens/$tokenString").toModel(Token::class.java)
     return when(status) {
         404 -> return halt(401, "Unauthorized")
         200 -> {
             val token = token as Token
-            if(System.currentTimeMillis() > token.validTo) {
+            if(token.isCalDavToken && controller.simpleName != "CaldavController")
+                return halt(401, "caldav token is not useable for other webservice methods")
+
+            if(System.currentTimeMillis() > token.validTo ){
                 return halt(401, "Token not valid")
             }
             val (status, user) = Unirest.get("${config.dbServiceEndpoint}/users/${token.userId}").toModel(User::class.java)
 
             var instance = controller.getConstructor(Request::class.java, Response::class.java, User::class.java).newInstance(req, resp, user)
-            resp.type("application/json")
             var args = mutableListOf<Any>()
             var bodyParam = method.parameters
                     .filter { it.isAnnotationPresent(ApiParam::class.java) }
@@ -125,13 +125,24 @@ fun invokeFunction(controller : Class<*>, method : Method, req : Request, resp :
                 var invokeResult = method.invoke(instance, *args.toTypedArray())
                 if (invokeResult is HttpStatus)
                     resp.status(invokeResult.code)
-                return jacksonObjectMapper().writeValueAsString(invokeResult)
+                val producesAnnotation = controller.getAnnotation(Produces::class.java)
+                resp.type(producesAnnotation.value[0])
+                return if(producesAnnotation.value.contains("application/json"))
+                    jacksonObjectMapper().writeValueAsString(invokeResult)
+                else
+                    invokeResult
             }
         }
         else -> BadRequest()
     }
 }
 
+fun Request.getAuthToken() : String? {
+    var authHeader = this.headers("Authorization")?.trim()
+    if(authHeader == null)
+        authHeader = this.queryParams("token")
+    return authHeader?.replace("Bearer", "")?.trim()
+}
 fun jacksonObjectMapper()  : ObjectMapper {
     var mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
     return mapper

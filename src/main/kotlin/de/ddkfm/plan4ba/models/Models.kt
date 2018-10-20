@@ -17,3 +17,9 @@ data class Login(
         var course : String,
         var university : String
 )
+
+data class LectureJob(
+        var userId: Int,
+        var hash: String,
+        var matriculationNumber: String
+)
