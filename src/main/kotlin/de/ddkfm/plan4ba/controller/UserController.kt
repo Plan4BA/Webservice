@@ -44,11 +44,9 @@ class UserController(req : Request, resp : Response, user : User) : ControllerIn
     )
     @Path("/caldavToken")
     fun getCaldavToken(): Any? {
-        val tokens = Unirest.get("${config.dbServiceEndpoint}/tokens?userId=${user.id}")
+        val tokens = Unirest.get("${config.dbServiceEndpoint}/tokens?userId=${user.id}&caldavToken=true")
                 .asJson().body.array.map { (it as JSONObject).toModel(Token::class.java) }
-        val caldavToken = tokens
-                .filter { it.isCalDavToken }
-                .firstOrNull()
+        val caldavToken = tokens.firstOrNull()
         return if(caldavToken == null) {
             val token = Token(UUID.randomUUID().toString().replace("-", ""),
                     user.id, true, (System.currentTimeMillis() + 365 * 24 * 3600 * 1000L))
