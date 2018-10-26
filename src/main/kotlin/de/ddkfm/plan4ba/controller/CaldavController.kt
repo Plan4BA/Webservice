@@ -113,6 +113,7 @@ class CaldavController(req : Request, resp : Response, user : User) : Controller
                 }
                 dailyEvents
             }.flatMap{ it }
+            calendar.events.addAll(events)
             return Biweekly.write(calendar).go()
         } catch (e : Exception) {
             e.printStackTrace()
