@@ -9,6 +9,12 @@ data class UserInfo(
         var lastLectureCall : Long
 )
 
+data class UniversityInfo(
+        var name : String,
+        var accentColor : String,
+        var logoUrl : String
+)
+
 data class Login(
         var forename : String,
         var surename : String,
