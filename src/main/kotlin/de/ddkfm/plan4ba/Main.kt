@@ -139,7 +139,7 @@ fun invokeFunction(controller : Class<*>, method : Method, req : Request, resp :
 
 fun Request.getAuthToken() : String? {
     var authHeader = this.headers("Authorization")?.trim()
-    if(authHeader == null)
+    if(authHeader == null || !authHeader.startsWith("Bearer"))
         authHeader = this.queryParams("token")
     return authHeader?.replace("Bearer", "")?.trim()
 }

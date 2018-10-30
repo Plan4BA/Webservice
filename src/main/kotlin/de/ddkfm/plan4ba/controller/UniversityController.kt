@@ -14,8 +14,8 @@ import javax.ws.rs.GET
 import javax.ws.rs.Path
 import javax.ws.rs.Produces
 
-@Api(value = "/user", description = "all operations abount a users university")
-@Path("/user")
+@Api(value = "/university", description = "all operations abount a users university")
+@Path("/university")
 @Produces("application/json")
 class UniversityController(req : Request, resp : Response, user : User) : ControllerInterface(req = req, resp = resp, user = user) {
 

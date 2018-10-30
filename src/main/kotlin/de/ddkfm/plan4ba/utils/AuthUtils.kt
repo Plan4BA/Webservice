@@ -154,12 +154,16 @@ fun loginCampusDual(username : String, password : String) : User? {
             500 -> return null
         }
         //trigger caching service
-        val job = LectureJob(user.id, login.hash, user.matriculationNumber)
-        Unirest.post("${config.cachingServiceEndpoint}/trigger")
-                .body(job.toJson())
-                .asJson()
+        triggerCaching(user, login.hash)
         user.password = password
         return user
     }
     return null
+}
+
+fun triggerCaching(user : User, hash : String) {
+    val job = LectureJob(user.id, hash, user.matriculationNumber)
+    Unirest.post("${config.cachingServiceEndpoint}/trigger")
+            .body(job.toJson())
+            .asJson()
 }
