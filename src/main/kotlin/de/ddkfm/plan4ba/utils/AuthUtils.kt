@@ -14,7 +14,7 @@ import java.util.*
 fun login(req : Request, resp : Response) : Any? {
     val auth = req.headers("Authorization")
     if(auth == null || !auth.startsWith("Basic ")) {
-        resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
+        //resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
         resp.status(401)
         return "Unauthorized"
     } else {
@@ -30,7 +30,7 @@ fun login(req : Request, resp : Response) : Any? {
             if(user == null)
                 user = loginCampusDual(username, password)
             if(user == null) {
-                resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
+                //resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
                 resp.status(401)
                 return "Unauthorized"
             }
@@ -39,7 +39,7 @@ fun login(req : Request, resp : Response) : Any? {
                     .body(JSONObject("{ \"password\" : \"$password\"}")).asString()
             when(authResp.status) {
                 in 400..404 -> {
-                    resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
+                    //resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
                     resp.status(401)
                     return "Unauthorized"
                 }

@@ -45,7 +45,7 @@ class LectureController(req : Request, resp : Response, user : User) : Controlle
         if(user.userHash.isNullOrEmpty()) {
             val auth = req.headers("Authorization")
             if (auth == null || !auth.startsWith("Basic ")) {
-                resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
+                //resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
                 resp.status(401)
                 return "Unauthorized"
             } else {
