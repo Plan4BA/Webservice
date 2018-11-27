@@ -11,6 +11,52 @@ import spark.Spark.halt
 import java.net.URLEncoder
 import java.util.*
 
+fun getShortToken(req : Request, resp : Response) : Any? {
+    resp.type("application/json")
+    val auth = req.headers("Authorization")
+    if(auth == null || !auth.startsWith("Bearer")) {
+        resp.status(401)
+        return "Unauthorized"
+    } else {
+        val tokenString = auth.replace("Bearer", "").trim()
+        val (status, token) = Unirest.get("${config.dbServiceEndpoint}/tokens/$tokenString").toModel(Token::class.java)
+        when(status) {
+            404 -> return halt(401, "Unauthorized")
+            200-> {
+                val token = token as Token
+                if(token.isCalDavToken)
+                    return halt(401, "caldav token is not useable for other webservice methods")
+
+                if(!token.isRefreshToken)
+                    return halt(401, "short token cannot be used for token refresh")
+
+                if(System.currentTimeMillis() > token.validTo ){
+                    return halt(401, "Token not valid")
+                }
+
+                var tokens = (Unirest.get("${config.dbServiceEndpoint}/tokens?userId=${token.userId}&caldavToken=false&refreshToken=false&valid=true")
+                        .toModel(Token::class.java).second as List<Token>)
+                        .firstOrNull()
+                if(tokens == null) {
+                    val shortToken = Token(UUID.randomUUID().toString().replace("-", ""),
+                            token.userId, false, false, System.currentTimeMillis() + config.shortTokenInterval)
+                    var (status, _) = Unirest.put("${config.dbServiceEndpoint}/tokens")
+                            .body(shortToken.toJson())
+                            .toModel(Token::class.java)
+                    when(status) {
+                        201 -> {
+                            val createdToken = (Unirest.get("${config.dbServiceEndpoint}/tokens/${shortToken.token}").toModel(Token::class.java).second as Token)
+                            return createdToken.toJson()
+                        }
+                        else -> return halt(500, "Internal Server Error")
+                    }
+                }
+                return tokens.toJson()
+            }
+        }
+    }
+    return halt(400, BadRequest().toJson())
+}
 fun login(req : Request, resp : Response) : Any? {
     val auth = req.headers("Authorization")
     if(auth == null || !auth.startsWith("Basic ")) {
@@ -47,12 +93,12 @@ fun login(req : Request, resp : Response) : Any? {
                     val storeHash = req.headers("StoreHash")?.toLowerCase()?.equals("true") ?: false
                     user = modifyHash(user, storeHash, password)
                     //authenticated
-                    var token = (Unirest.get("${config.dbServiceEndpoint}/tokens?userId=${user?.id}&caldavToken=false&valid=true")
+                    var token = (Unirest.get("${config.dbServiceEndpoint}/tokens?userId=${user?.id}&caldavToken=false&refreshToken=true&valid=true")
                             .toModel(Token::class.java).second as List<Token>)
                             .firstOrNull()
                     if(token == null) {
                         token = Token(UUID.randomUUID().toString().replace("-", ""), user.id,
-                                false, System.currentTimeMillis() + 20 * 60 * 1000)
+                                false, true, System.currentTimeMillis() + config.refreshTokenInterval)
                         token = (Unirest.put("${config.dbServiceEndpoint}/tokens")
                                 .body(token.toJson())
                                 .toModel(Token::class.java).second as Token)

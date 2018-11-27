@@ -6,7 +6,6 @@ import de.ddkfm.plan4ba.controller.SwaggerParser
 import de.ddkfm.plan4ba.models.*
 import de.ddkfm.plan4ba.utils.*
 import io.swagger.annotations.*
-import org.json.JSONObject
 import org.reflections.Reflections
 import spark.Request
 import spark.Response
@@ -14,7 +13,6 @@ import spark.Spark.*
 import spark.kotlin.port
 import spark.utils.IOUtils
 import java.lang.reflect.Method
-import java.util.*
 import javax.ws.rs.*
 
 var config = Config()
@@ -46,6 +44,7 @@ fun main(args : Array<String>) {
         }
     }
     get("/login", ::login)
+    get("/token", ::getShortToken)
 
     if(getEnvOrDefault("ENABLE_SWAGGER", "false").toBoolean()) {
         var swaggerJson = SwaggerParser.getSwaggerJson("de.ddkfm.plan4ba.controller");
@@ -71,6 +70,9 @@ fun invokeFunction(controller : Class<*>, method : Method, req : Request, resp :
             val token = token as Token
             if(token.isCalDavToken && controller.simpleName != "CaldavController")
                 return halt(401, "caldav token is not useable for other webservice methods")
+
+            if(token.isRefreshToken)
+                return halt(401, "refreshtoken cannot be used for API-Calls")
 
             if(System.currentTimeMillis() > token.validTo ){
                 return halt(401, "Token not valid")
