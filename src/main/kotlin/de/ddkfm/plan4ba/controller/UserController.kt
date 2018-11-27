@@ -34,7 +34,7 @@ class UserController(req : Request, resp : Response, user : User) : ControllerIn
                 .toModel(University::class.java)
                 .second as University
         return UserInfo(user.matriculationNumber, group.uid, university.name, !user.userHash.isNullOrEmpty(),
-                user.lastLecturePolling, user.lastLecturePolling)
+                user.lastLecturePolling, user.lastLectureCall)
     }
 
     @GET
@@ -49,7 +49,7 @@ class UserController(req : Request, resp : Response, user : User) : ControllerIn
         val caldavToken = tokens.firstOrNull()
         return if(caldavToken == null) {
             val token = Token(UUID.randomUUID().toString().replace("-", ""),
-                    user.id, true, (System.currentTimeMillis() + 365 * 24 * 3600 * 1000L))
+                    user.id, true, false, (System.currentTimeMillis() + 365 * 24 * 3600 * 1000L));
             val (status, tokenResp) = Unirest.put("${config.dbServiceEndpoint}/tokens")
                     .body(token.toJson())
                     .toModel(Token::class.java)
