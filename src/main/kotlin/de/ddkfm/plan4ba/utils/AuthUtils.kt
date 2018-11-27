@@ -44,7 +44,7 @@ fun getShortToken(req : Request, resp : Response) : Any? {
                             .body(shortToken.toJson())
                             .toModel(Token::class.java)
                     when(status) {
-                        201 -> {
+                        200, 201 -> {
                             val createdToken = (Unirest.get("${config.dbServiceEndpoint}/tokens/${shortToken.token}").toModel(Token::class.java).second as Token)
                             return createdToken.toJson()
                         }
