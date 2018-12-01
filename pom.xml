@@ -6,7 +6,7 @@
 
     <groupId>de.ddkfm.plan4ba</groupId>
     <artifactId>Webservice</artifactId>
-    <version>1.4</version>
+    <version>1.5</version>
 
     <properties>
         <kotlin.version>1.2.71</kotlin.version>

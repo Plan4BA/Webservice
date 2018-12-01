@@ -35,7 +35,7 @@ class LectureController(req : Request, resp : Response, user : User) : Controlle
     }
 
     @GET
-    @ApiOperation(value = "trigger the lecture caching")
+    @ApiOperation(value = "trigger the lecture caching", authorizations = [Authorization(value = "Basic")])
     @ApiResponses(
             ApiResponse(code = 200, message = "successfull", response = OK::class),
             ApiResponse(code = 401, message = "Unauthorized")

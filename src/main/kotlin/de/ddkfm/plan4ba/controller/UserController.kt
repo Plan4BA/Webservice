@@ -2,13 +2,16 @@ package de.ddkfm.plan4ba.controller
 
 import com.mashape.unirest.http.Unirest
 import de.ddkfm.plan4ba.models.*
+import de.ddkfm.plan4ba.utils.loginCampusDual
 import de.ddkfm.plan4ba.utils.toJson
 import de.ddkfm.plan4ba.utils.toModel
+import de.ddkfm.plan4ba.utils.triggerCaching
 import io.swagger.annotations.*
 import org.json.JSONObject
 import spark.Request
 import spark.Response
 import java.util.*
+import javax.ws.rs.DELETE
 
 import javax.ws.rs.GET
 import javax.ws.rs.Path
@@ -59,6 +62,33 @@ class UserController(req : Request, resp : Response, user : User) : ControllerIn
             }
         } else {
             caldavToken
+        }
+    }
+
+    @DELETE
+    @ApiOperation(value = "delete all userdata", authorizations = [Authorization(value = "Basic")])
+    @ApiResponses(
+            ApiResponse(code = 200, message = "successfull", response = OK::class),
+            ApiResponse(code = 401, message = "Unauthorized")
+    )
+    @Path("/delete")
+    fun delete() : Any? {
+        val auth = req.headers("Authorization")
+        return if (auth == null || !auth.startsWith("Basic ")) {
+            //resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
+            resp.status(401)
+            "Unauthorized"
+        } else {
+            val encoded = String(Base64.getDecoder().decode(auth.replace("Basic", "").trim().toByteArray()))
+            val username = encoded.split(":")[0]
+            val password = encoded.split(":")[1]
+            val deleteResp = Unirest.delete("${config.dbServiceEndpoint}/users/${user.id}")
+                    .body("{ \"password\": \"$password\" }")
+                    .asJson()
+            if(deleteResp.status == 200)
+                OK()
+            else
+                Unauthorized()
         }
     }
 

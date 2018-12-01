@@ -1,5 +1,5 @@
 FROM library/openjdk:10-jre
-ARG WEBSERVICE_VERSION=1.4
+ARG WEBSERVICE_VERSION=1.5
 
 COPY target/Webservice-${WEBSERVICE_VERSION}-jar-with-dependencies.jar /app/Webservice.jar
 WORKDIR /app

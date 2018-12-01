@@ -1,5 +1,8 @@
 package de.ddkfm.plan4ba.models
 
+import de.ddkfm.plan4ba.config
+import java.util.*
+
 data class User(
         var id: Int,
         var matriculationNumber: String,
@@ -17,7 +20,23 @@ data class Token(
         var isCalDavToken : Boolean,
         var isRefreshToken : Boolean,
         var validTo : Long
-)
+) {
+    companion object {
+        fun getValidShortToken(userId : Int) : Token {
+            return Token(UUID.randomUUID().toString().replace("-", ""), userId, false, false, 0).makeValid()
+        }
+    }
+
+    fun makeValid() : Token {
+        val interval = if(isRefreshToken)
+            config.refreshTokenInterval
+        else if(isCalDavToken)
+            config.caldavTokenInterval
+        else
+            config.shortTokenInterval
+        return copy(validTo = System.currentTimeMillis() + interval)
+    }
+}
 
 data class UserGroup(
         var id : Int,

@@ -29,3 +29,8 @@ data class LectureJob(
         var hash: String,
         var matriculationNumber: String
 )
+
+data class Authentication(
+        var username : String,
+        var password : String
+)

@@ -6,6 +6,7 @@ import de.ddkfm.plan4ba.controller.SwaggerParser
 import de.ddkfm.plan4ba.models.*
 import de.ddkfm.plan4ba.utils.*
 import io.swagger.annotations.*
+import org.json.JSONObject
 import org.reflections.Reflections
 import spark.Request
 import spark.Response
@@ -13,6 +14,7 @@ import spark.Spark.*
 import spark.kotlin.port
 import spark.utils.IOUtils
 import java.lang.reflect.Method
+import java.util.*
 import javax.ws.rs.*
 
 var config = Config()
@@ -61,9 +63,39 @@ fun main(args : Array<String>) {
 }
 
 fun invokeFunction(controller : Class<*>, method : Method, req : Request, resp : Response) : Any {
-    val tokenString = req.getAuthToken() ?: return halt(401, "Unauthorized")
+    val tokenString = req.getAuthToken()
 
-    val (status, token) = Unirest.get("${config.dbServiceEndpoint}/tokens/$tokenString").toModel(Token::class.java)
+    var (status, token) = Unirest.get("${config.dbServiceEndpoint}/tokens/$tokenString").toModel(Token::class.java)
+    val apiOperationAnnotation = method.annotations
+            .filter { it is ApiOperation }
+            .map { it as ApiOperation }
+            .firstOrNull()
+    if(apiOperationAnnotation != null) {
+        val authorizations = apiOperationAnnotation.authorizations
+        if(authorizations.isNotEmpty() && (authorizations.firstOrNull { it.value == "Basic" } != null)) {
+            val auth = req.getAuth()
+            if(auth != null) {
+                val user = (Unirest.get("${config.dbServiceEndpoint}/users?matriculationNumber=${auth.username}")
+                        .toModel(User::class.java)
+                        .second as List<User>)
+                        .firstOrNull() ?: return halt(401, "Unauthorized")
+
+                val authResp = Unirest.post("${config.dbServiceEndpoint}/users/${user.id}/authenticate")
+                        .body(JSONObject("{ \"password\" : \"${auth.password}\"}")).asString()
+                when(authResp.status) {
+                    in 400..404 -> {
+                        return halt(401, "Unauthorized")
+                    }
+                    200 -> {
+                        status = 200
+                        token = Token.getValidShortToken(user.id)
+                    }
+                }
+            } else {
+                return halt(401, "Unauthorized")
+            }
+        }
+    }
     return when(status) {
         404 -> return halt(401, "Unauthorized")
         200 -> {
@@ -144,6 +176,15 @@ fun Request.getAuthToken() : String? {
     if(authHeader == null || !authHeader.startsWith("Bearer"))
         authHeader = this.queryParams("token")
     return authHeader?.replace("Bearer", "")?.trim()
+}
+fun Request.getAuth() : Authentication? {
+    val auth = this.headers("Authorization")
+    return if(auth.startsWith("Basic")) {
+        val encoded = String(Base64.getDecoder().decode(auth.replace("Basic", "").trim().toByteArray()))
+        val username = encoded.split(":")[0]
+        val password = encoded.split(":")[1]
+        return Authentication(username, password)
+    } else null
 }
 fun jacksonObjectMapper()  : ObjectMapper {
     var mapper = com.fasterxml.jackson.module.kotlin.jacksonObjectMapper()
