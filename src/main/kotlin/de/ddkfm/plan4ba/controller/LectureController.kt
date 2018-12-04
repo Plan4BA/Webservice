@@ -2,6 +2,7 @@ package de.ddkfm.plan4ba.controller
 
 import com.mashape.unirest.http.Unirest
 import de.ddkfm.plan4ba.models.*
+import de.ddkfm.plan4ba.utils.RequestLimiter
 import de.ddkfm.plan4ba.utils.loginCampusDual
 import de.ddkfm.plan4ba.utils.toModel
 import de.ddkfm.plan4ba.utils.triggerCaching
@@ -42,6 +43,9 @@ class LectureController(req : Request, resp : Response, user : User) : Controlle
     )
     @Path("/trigger")
     fun trigger() : Any? {
+        if(RequestLimiter.hasLock(user))
+            return BadRequest("locked")
+        RequestLimiter.addLock(user)
         if(user.userHash.isNullOrEmpty()) {
             val auth = req.headers("Authorization")
             if (auth == null || !auth.startsWith("Basic ")) {
