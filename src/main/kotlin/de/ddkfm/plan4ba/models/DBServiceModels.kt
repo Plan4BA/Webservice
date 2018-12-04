@@ -87,3 +87,9 @@ data class Geo(
         var latitude : Double
 )
 
+data class Infotext(
+        var id : Int,
+        var key : String,
+        var description: String
+)
+

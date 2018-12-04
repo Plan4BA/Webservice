@@ -34,3 +34,7 @@ data class Authentication(
         var username : String,
         var password : String
 )
+data class SimpleInfotext(
+        var key : String,
+        var description : String
+)
