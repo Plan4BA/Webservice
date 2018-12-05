@@ -36,7 +36,7 @@ class LectureController(req : Request, resp : Response, user : User) : Controlle
     }
 
     @GET
-    @ApiOperation(value = "trigger the lecture caching", authorizations = [Authorization(value = "Basic")])
+    @ApiOperation(value = "trigger the lecture caching", authorizations = [Authorization(value = "Basic"), Authorization(value = "Token")])
     @ApiResponses(
             ApiResponse(code = 200, message = "successfull", response = OK::class),
             ApiResponse(code = 401, message = "Unauthorized")
@@ -51,7 +51,7 @@ class LectureController(req : Request, resp : Response, user : User) : Controlle
             if (auth == null || !auth.startsWith("Basic ")) {
                 //resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
                 resp.status(401)
-                return "Unauthorized"
+                return Unauthorized("Hash not stored. Basic Authentication is required")
             } else {
                 val encoded = String(Base64.getDecoder().decode(auth.replace("Basic", "").trim().toByteArray()))
                 val username = encoded.split(":")[0]

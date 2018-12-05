@@ -73,27 +73,31 @@ fun invokeFunction(controller : Class<*>, method : Method, req : Request, resp :
             .firstOrNull()
     if(apiOperationAnnotation != null) {
         val authorizations = apiOperationAnnotation.authorizations
-        if(authorizations.isNotEmpty() && (authorizations.firstOrNull { it.value == "Basic" } != null)) {
-            val auth = req.getAuth()
-            if(auth != null) {
-                val user = (Unirest.get("${config.dbServiceEndpoint}/users?matriculationNumber=${auth.username}")
-                        .toModel(User::class.java)
-                        .second as List<User>)
-                        .firstOrNull() ?: return halt(401, "Unauthorized")
+        if(authorizations.isNotEmpty()) {
+            if(authorizations.firstOrNull {it.value == "Basic"} != null) {
+                val auth = req.getAuth()
+                if(auth != null) {
+                    val user = (Unirest.get("${config.dbServiceEndpoint}/users?matriculationNumber=${auth.username}")
+                            .toModel(User::class.java)
+                            .second as List<User>)
+                            .firstOrNull() ?: return halt(401, "Unauthorized")
 
-                val authResp = Unirest.post("${config.dbServiceEndpoint}/users/${user.id}/authenticate")
-                        .body(JSONObject("{ \"password\" : \"${auth.password}\"}")).asString()
-                when(authResp.status) {
-                    in 400..404 -> {
-                        return halt(401, "Unauthorized")
+                    val authResp = Unirest.post("${config.dbServiceEndpoint}/users/${user.id}/authenticate")
+                            .body(JSONObject("{ \"password\" : \"${auth.password}\"}")).asString()
+                    when(authResp.status) {
+                        in 400..404 -> {
+                            return halt(401, "Unauthorized")
+                        }
+                        200 -> {
+                            status = 200
+                            token = Token.getValidShortToken(user.id)
+                        }
                     }
-                    200 -> {
-                        status = 200
-                        token = Token.getValidShortToken(user.id)
-                    }
+                } else if(authorizations.firstOrNull { it.value == "Token" } != null) {
+                    //do nothing --> normal authToken will be used
+                } else {
+                    return halt(401, "Unauthorized")
                 }
-            } else {
-                return halt(401, "Unauthorized")
             }
         }
     }
