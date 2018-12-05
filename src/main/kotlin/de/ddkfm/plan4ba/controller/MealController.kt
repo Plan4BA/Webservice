@@ -4,6 +4,7 @@ import com.mashape.unirest.http.Unirest
 import de.ddkfm.plan4ba.models.*
 import de.ddkfm.plan4ba.utils.toModel
 import io.swagger.annotations.*
+import org.apache.commons.lang3.StringEscapeUtils
 import org.json.JSONObject
 import spark.Request
 import spark.Response
@@ -34,6 +35,11 @@ class MealController(req : Request, resp : Response, user : User) : ControllerIn
         val meals = Unirest.get("${config.dbServiceEndpoint}/universities/${university.id}/meals")
                 .asJson().body.array
                 .map { (it as JSONObject).toModel(Meal::class.java) }
+                .map {meal ->
+                    meal.copy(meals = meal.meals.map { food ->
+                        food.copy(description = StringEscapeUtils.unescapeHtml4(food.description))
+                    })
+                }
         return meals
     }
 }
