@@ -24,13 +24,15 @@ class LinksController(req : Request, resp : Response, user : User) : ControllerI
 
     @GET
     @ApiOperation(value = "get all links by user")
+    @ApiImplicitParam(name = "language", dataType = "string", paramType = "query")
     @ApiResponses(
             ApiResponse(code = 200, message = "successfull", response = SimpleLink::class, responseContainer = "List")
     )
     @Path("")
-    fun getUniversityLinks(): Any? {
+    fun getUniversityLinks(@ApiParam(hidden = true) language : String): Any? {
         return (Unirest.get("${config.dbServiceEndpoint}/users/${user.id}/links")
                 .toModel(Link::class.java)
-                .second as List<Link>).map { SimpleLink(it.id, it.label, it.url) }
+                .second as List<Link>).map { SimpleLink(it.id, it.label, it.url, it.language) }
+                .filter { language.isEmpty() || language == it.language }
     }
 }

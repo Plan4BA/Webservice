@@ -37,20 +37,22 @@ data class Authentication(
 )
 data class SimpleInfotext(
         var key : String,
-        var description : String
+        var description : String,
+        var language : String
 )
 
 data class SimpleNotification(
         var id : Int,
         var label : String,
-        var description : String
-        /*var type : String,
-        var viewed : Boolean,
+        var description : String,
+        var type : String
+        /*var viewed : Boolean,
         var data : NotificationData?*/
 )
 
 data class SimpleLink(
         var id : Int,
         var label : String,
-        var url : String
+        var url : String,
+        var language : String
 )

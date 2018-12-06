@@ -25,7 +25,7 @@ class NotificationController(req : Request, resp : Response, user : User) : Cont
     fun getNotifications(): Any? {
         val notifications = Unirest.get("${config.dbServiceEndpoint}/notifications?userId=${user.id}")
                 .toModel(Notification::class.java).second as List<Notification>
-        return notifications.map { SimpleNotification(it.id, it.label, it.description) }
+        return notifications.map { SimpleNotification(it.id, it.label, it.description, it.type) }
     }
 
     @DELETE
