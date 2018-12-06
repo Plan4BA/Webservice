@@ -12,7 +12,8 @@ data class UserInfo(
 data class UniversityInfo(
         var name : String,
         var accentColor : String,
-        var logoUrl : String
+        var logoUrl : String,
+        var links : List<SimpleLink>?
 )
 
 data class Login(

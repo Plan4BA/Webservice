@@ -33,9 +33,13 @@ class UniversityController(req : Request, resp : Response, user : User) : Contro
         val university = Unirest.get("${config.dbServiceEndpoint}/universities/${group.universityId}")
                 .toModel(University::class.java)
                 .second as University
-        return UniversityInfo(university.name, university.accentColor, university.logoUrl)
+        val links = (Unirest.get("${config.dbServiceEndpoint}/universities/${university.id}/links")
+                .toModel(Link::class.java)
+                .second as List<Link>)
+                .map { SimpleLink(it.id, it.label, it.url) }
+        return UniversityInfo(university.name, university.accentColor, university.logoUrl, links)
     }
-
+    /*
     @GET
     @ApiOperation(value = "get all links from a university")
     @ApiResponses(
@@ -54,4 +58,5 @@ class UniversityController(req : Request, resp : Response, user : User) : Contro
                 .toModel(Link::class.java)
                 .second as List<Link>
     }
+    */
 }
