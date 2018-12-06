@@ -5,15 +5,15 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 
 object RequestLimiter {
-    val lock : MutableMap<User, Int> = mutableMapOf()
+    val lock : MutableMap<Int, Int> = mutableMapOf()
     fun hasLock(user : User) : Boolean {
-        val contains = lock.containsKey(user)
+        val contains = lock.containsKey(user.id)
         if(contains)
-            return lock[user] == LocalTime.now().hour
+            return lock[user.id] == LocalTime.now().hour
         else
             return false
     }
     fun addLock(user : User) {
-        lock[user] = LocalDateTime.now().hour
+        lock[user.id] = LocalDateTime.now().hour
     }
 }
