@@ -33,10 +33,6 @@ class UniversityController(req : Request, resp : Response, user : User) : Contro
         val university = Unirest.get("${config.dbServiceEndpoint}/universities/${group.universityId}")
                 .toModel(University::class.java)
                 .second as University
-        val links = (Unirest.get("${config.dbServiceEndpoint}/universities/${university.id}/links")
-                .toModel(Link::class.java)
-                .second as List<Link>)
-                .map { SimpleLink(it.id, it.label, it.url, it.language) }
-        return UniversityInfo(university.name, university.accentColor, university.logoUrl, links)
+        return UniversityInfo(university.name, university.accentColor, university.logoUrl)
     }
 }
