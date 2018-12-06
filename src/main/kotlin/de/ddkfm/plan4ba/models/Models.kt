@@ -38,3 +38,12 @@ data class SimpleInfotext(
         var key : String,
         var description : String
 )
+
+data class SimpleNotification(
+        var id : Int,
+        var label : String,
+        var description : String
+        /*var type : String,
+        var viewed : Boolean,
+        var data : NotificationData?*/
+)
