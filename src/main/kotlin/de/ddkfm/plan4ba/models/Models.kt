@@ -47,3 +47,9 @@ data class SimpleNotification(
         var viewed : Boolean,
         var data : NotificationData?*/
 )
+
+data class SimpleLink(
+        var id : Int,
+        var label : String,
+        var url : String
+)
