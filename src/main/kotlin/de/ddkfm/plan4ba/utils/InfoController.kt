@@ -8,13 +8,15 @@ import spark.Request
 import spark.Response
 
 fun info(req : Request, resp : Response) : Any {
-    val language = req.queryParams("language")
+    var language = req.queryParams("language")
+    if(language.isNullOrEmpty())
+        language = "de"
+
     val key = req.queryParams("key")
     val filter = if(key.isNullOrEmpty()) "" else "?key=$key"
-    var infoTexts = Unirest.get("${config.dbServiceEndpoint}/info$filter")
-            .toModel(Infotext::class.java).second as List<Infotext>
-    if(language?.isNotEmpty() == true)
-        infoTexts = infoTexts.filter { it.language == language }
+    var infoTexts = (Unirest.get("${config.dbServiceEndpoint}/info$filter")
+            .toModel(Infotext::class.java).second as List<Infotext>)
+            .filter { it.language == language }
     resp.type("application/json")
     return infoTexts.map { SimpleInfotext(it.key, it.description, it.language) }.toJson()
 }

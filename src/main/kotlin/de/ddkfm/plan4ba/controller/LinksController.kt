@@ -30,9 +30,10 @@ class LinksController(req : Request, resp : Response, user : User) : ControllerI
     )
     @Path("")
     fun getUniversityLinks(@ApiParam(hidden = true) language : String): Any? {
+        val actualLanguage = if(language == null || language.isEmpty()) "de" else language
         return (Unirest.get("${config.dbServiceEndpoint}/users/${user.id}/links")
                 .toModel(Link::class.java)
                 .second as List<Link>).map { SimpleLink(it.id, it.label, it.url, it.language) }
-                .filter { language.isEmpty() || language == it.language }
+                .filter { actualLanguage == it.language }
     }
 }
