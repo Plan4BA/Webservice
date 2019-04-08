@@ -31,9 +31,11 @@ class LinksController(req : Request, resp : Response, user : User) : ControllerI
     @Path("")
     fun getUniversityLinks(@ApiParam(hidden = true) language : String): Any? {
         val actualLanguage = if(language == null || language.isEmpty()) "de" else language
+        val caldavToken =UserController(req, resp,user).getCaldavToken() as Token
         return (Unirest.get("${config.dbServiceEndpoint}/users/${user.id}/links")
                 .toModel(Link::class.java)
                 .second as List<Link>).map { SimpleLink(it.id, it.label, it.url, it.language) }
                 .filter { actualLanguage == it.language }
+            .union(listOf(SimpleLink(0, "CALDAV-Link", "${req.scheme()}://${req.host()}/api/caldav/all?token=${caldavToken.token}", actualLanguage)))
     }
 }
