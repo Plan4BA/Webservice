@@ -20,7 +20,7 @@ import javax.ws.rs.*
 var config = Config()
 
 fun main(args : Array<String>) {
-    port(8080)
+    port(System.getenv("HTTP_PORT")?.toIntOrNull() ?: 8080)
 
     config.buildFromEnv()
     println(config)
