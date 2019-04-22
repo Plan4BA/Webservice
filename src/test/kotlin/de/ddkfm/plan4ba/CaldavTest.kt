@@ -1,5 +1,5 @@
 import biweekly.Biweekly
-import com.mashape.unirest.http.Unirest
+import kong.unirest.Unirest
 import de.ddkfm.plan4ba.models.Lecture
 import de.ddkfm.plan4ba.models.OK
 import de.ddkfm.plan4ba.models.Token
@@ -14,7 +14,6 @@ class CaldavTest {
     val endpoint = Webservice.endpoint
     init {
         Webservice.start()
-        Unirest.setDefaultHeader("Accept-Encoding", "gzip")
     }
     @Test
     fun getCaldavLectures() {

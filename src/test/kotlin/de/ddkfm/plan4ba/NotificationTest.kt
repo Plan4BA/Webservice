@@ -1,4 +1,4 @@
-import com.mashape.unirest.http.Unirest
+import kong.unirest.Unirest
 import de.ddkfm.plan4ba.models.Lecture
 import de.ddkfm.plan4ba.models.Notification
 import de.ddkfm.plan4ba.models.OK

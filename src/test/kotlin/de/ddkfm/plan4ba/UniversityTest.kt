@@ -1,4 +1,4 @@
-import com.mashape.unirest.http.Unirest
+import kong.unirest.Unirest
 import de.ddkfm.plan4ba.models.UniversityInfo
 import de.ddkfm.plan4ba.utils.toModel
 import org.junit.jupiter.api.Test

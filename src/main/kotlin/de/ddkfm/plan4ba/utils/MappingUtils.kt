@@ -1,12 +1,8 @@
 package de.ddkfm.plan4ba.utils
 
-import com.mashape.unirest.http.HttpResponse
-import com.mashape.unirest.http.JsonNode
-import com.mashape.unirest.request.GetRequest
-import com.mashape.unirest.request.HttpRequestWithBody
-import com.mashape.unirest.request.body.RequestBodyEntity
 import de.ddkfm.plan4ba.jacksonObjectMapper
 import de.ddkfm.plan4ba.models.HttpStatus
+import kong.unirest.*
 import org.json.JSONObject
 import java.lang.reflect.Parameter
 import java.net.URLEncoder

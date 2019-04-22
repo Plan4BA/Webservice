@@ -1,4 +1,4 @@
-import com.mashape.unirest.http.Unirest
+import kong.unirest.Unirest
 import de.ddkfm.plan4ba.models.Meal
 import de.ddkfm.plan4ba.models.SimpleLink
 import de.ddkfm.plan4ba.utils.toListModel

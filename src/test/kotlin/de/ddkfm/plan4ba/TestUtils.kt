@@ -1,8 +1,6 @@
-import com.mashape.unirest.http.HttpResponse
-import com.mashape.unirest.request.BaseRequest
-import com.mashape.unirest.request.GetRequest
-import com.mashape.unirest.request.HttpRequestWithBody
-import java.net.http.HttpRequest
+import kong.unirest.GetRequest
+import kong.unirest.HttpRequestWithBody
+import kong.unirest.HttpResponse
 import java.util.*
 
 

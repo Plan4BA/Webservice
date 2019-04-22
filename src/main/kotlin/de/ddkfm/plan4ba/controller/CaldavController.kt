@@ -64,7 +64,7 @@ class CaldavController(req : Request, resp : Response, user : User) : Controller
     fun getMeals(): String {
         try {
             val mealController = MealController(req, resp, user)
-            val meals = mealController.getMeals() as List<Meal>
+            val meals = mealController.getMeals()
             val calendar = ICalendar()
             val group = DBService.get<UserGroup>(user.groupId).maybe
                 ?: throw InternalServerError("group can not be found").asException()

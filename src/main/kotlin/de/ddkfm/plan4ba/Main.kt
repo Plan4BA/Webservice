@@ -1,16 +1,15 @@
 package de.ddkfm.plan4ba
 
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.mashape.unirest.http.Unirest
 import de.ddkfm.plan4ba.models.*
 import de.ddkfm.plan4ba.utils.*
+import kong.unirest.Unirest
 import org.json.JSONObject
 import org.reflections.Reflections
 import spark.Request
 import spark.Response
 import spark.Spark.*
-import spark.kotlin.after
-import spark.kotlin.port
+import spark.utils.SparkUtils
 import java.lang.reflect.Method
 import java.util.*
 import javax.ws.rs.*
@@ -43,12 +42,12 @@ fun main(args : Array<String>) {
             }
         }
     }
-    exception(Exception::class.java) { exception, request, response ->
+    exception(Exception::class.java) { exception, _, response ->
         exception.printStackTrace()
         response.status(500)
         response.body(jacksonObjectMapper().writeValueAsString(InternalServerError()))
     }
-    after {
+    after(SparkUtils.ALL_PATHS) { request, response ->
         request.headers("Accept-Encoding")?.equals("gzip")?.run {
             response.header("Content-Encoding", "gzip")
         }
@@ -63,8 +62,8 @@ fun invokeFunction(controller : Class<*>, method : Method, req : Request, resp :
 
     var aUser : User? = null
 
-    loop@ for(auth in authorizations) {
-        when(auth.annotationClass) {
+    loop@ for(authorization in authorizations) {
+        when(authorization.annotationClass) {
             BasicAuth::class -> {
                 val auth = req.getBasicAuth() ?: continue@loop
                 val username = auth.username

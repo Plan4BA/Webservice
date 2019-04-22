@@ -1,6 +1,6 @@
 package de.ddkfm.plan4ba.controller
 
-import com.mashape.unirest.http.Unirest
+import kong.unirest.Unirest
 import de.ddkfm.plan4ba.models.Token
 import de.ddkfm.plan4ba.models.User
 import de.ddkfm.plan4ba.utils.DBService

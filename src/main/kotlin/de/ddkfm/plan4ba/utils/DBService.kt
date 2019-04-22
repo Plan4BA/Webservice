@@ -1,6 +1,6 @@
 package de.ddkfm.plan4ba.utils
 
-import com.mashape.unirest.http.Unirest
+import kong.unirest.Unirest
 import de.ddkfm.plan4ba.config
 import de.ddkfm.plan4ba.models.*
 import org.json.JSONObject
