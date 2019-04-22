@@ -6,6 +6,7 @@ import com.mashape.unirest.request.GetRequest
 import com.mashape.unirest.request.HttpRequestWithBody
 import com.mashape.unirest.request.body.RequestBodyEntity
 import de.ddkfm.plan4ba.jacksonObjectMapper
+import de.ddkfm.plan4ba.models.HttpStatus
 import io.swagger.annotations.ApiImplicitParam
 import org.json.JSONObject
 import spark.utils.IOUtils
@@ -56,6 +57,12 @@ fun <T> JSONObject.toModel(type : Class<T>) : T {
     return jacksonObjectMapper().readValue(this.toString(), type)
 }
 
+inline fun <reified T> String.toModel() : T? {
+    return  jacksonObjectMapper().readValue(this, T::class.java)
+}
+inline fun <reified T> String.toListModel() : List<T>? {
+    return  jacksonObjectMapper().readValue(this, jacksonObjectMapper().typeFactory.constructCollectionType(List::class.java, T::class.java))
+}
 fun HttpResponse<JsonNode>.mapModel(type : Class<*>) : Pair<Int, Any> {
     return this.status to when(this.status) {
         in 200..299 -> {
@@ -74,3 +81,20 @@ fun RequestBodyEntity.toModel(type : Class<*>) : Pair<Int, Any> = this.asJson().
 
 
 fun String.encode() : String = URLEncoder.encode(this, "UTF-8")
+
+data class Maybe<T>(
+    val maybe : T?,
+    val error : HttpStatus?
+) {
+    companion object {
+        fun <T> of(maybe : T) : Maybe<T> {
+            return Maybe(maybe, null)
+        }
+        fun <T> ofError(error : HttpStatus) : Maybe<T> {
+            return Maybe(null, error)
+        }
+    }
+    fun getOrThrow() : T {
+        return maybe ?: throw (error?.asException() ?: NullPointerException())
+    }
+}
