@@ -8,9 +8,11 @@ import de.ddkfm.plan4ba.utils.*
 import io.swagger.annotations.*
 import org.json.JSONObject
 import org.reflections.Reflections
+import spark.ExceptionHandler
 import spark.Request
 import spark.Response
 import spark.Spark.*
+import spark.kotlin.after
 import spark.kotlin.port
 import spark.utils.IOUtils
 import java.lang.reflect.Method
@@ -48,48 +50,44 @@ fun main(args : Array<String>) {
     get("/login", ::login)
     get("/token", ::getShortToken)
     get("/info", ::info)
-
-    if(getEnvOrDefault("ENABLE_SWAGGER", "false").toBoolean()) {
-        var swaggerJson = SwaggerParser.getSwaggerJson("de.ddkfm.plan4ba.controller");
-
-        get("/swagger") { req, res ->
-            swaggerJson
-        }
-
-        get("/swagger/html") { req, resp ->
-            IOUtils.copy(SwaggerParser.javaClass.getResourceAsStream("/index.html"), resp.raw().outputStream)
+    exception(Exception::class.java) { exception, request, response ->
+        exception.printStackTrace()
+        response.status(500)
+        response.body(jacksonObjectMapper().writeValueAsString(InternalServerError()))
+    }
+    after {
+        request.headers("Accept-Encoding")?.equals("gzip")?.run {
+            response.header("Content-Encoding", "gzip")
         }
     }
 
 }
 
 fun invokeFunction(controller : Class<*>, method : Method, req : Request, resp : Response) : Any {
-    val tokenString = req.getAuthToken()
+    val tokenString: String? = req.getAuthToken() ?: req.queryParams("token")
+    var token = tokenString?.let { DBService.get<Token>(it) }?.maybe
+    val basicAuth = req.getAuth()
 
-    var (status, token) = Unirest.get("${config.dbServiceEndpoint}/tokens/$tokenString").toModel(Token::class.java)
     val apiOperationAnnotation = method.annotations
-            .filter { it is ApiOperation }
-            .map { it as ApiOperation }
-            .firstOrNull()
+        .filter { it is ApiOperation }
+        .map { it as ApiOperation }
+        .firstOrNull()
+
     if(apiOperationAnnotation != null) {
         val authorizations = apiOperationAnnotation.authorizations
         if(authorizations.isNotEmpty()) {
             if(authorizations.firstOrNull {it.value == "Basic"} != null) {
-                val auth = req.getAuth()
-                if(auth != null) {
-                    val user = (Unirest.get("${config.dbServiceEndpoint}/users?matriculationNumber=${auth.username}")
-                            .toModel(User::class.java)
-                            .second as List<User>)
-                            .firstOrNull() ?: return halt(401, "Unauthorized")
+                if(basicAuth != null) {
+                    val user = DBService.all<User>("matriculationNumber" to basicAuth.username).maybe?.firstOrNull()
+                        ?: return halt(401, "Unauthorized")
 
                     val authResp = Unirest.post("${config.dbServiceEndpoint}/users/${user.id}/authenticate")
-                            .body(JSONObject("{ \"password\" : \"${auth.password}\"}")).asString()
+                        .body(JSONObject("{ \"password\" : \"${basicAuth.password}\"}")).asString()
                     when(authResp.status) {
                         in 400..404 -> {
                             return halt(401, "Unauthorized")
                         }
                         200 -> {
-                            status = 200
                             token = Token.getValidShortToken(user.id)
                         }
                     }
@@ -101,78 +99,84 @@ fun invokeFunction(controller : Class<*>, method : Method, req : Request, resp :
             }
         }
     }
-    return when(status) {
-        404 -> return halt(401, "Unauthorized")
-        200 -> {
-            val token = token as Token
-            if(token.isCalDavToken && controller.simpleName != "CaldavController")
-                return halt(401, "caldav token is not useable for other webservice methods")
+    if(token == null)
+        return halt(401, "Unauthorized")
 
-            if(token.isRefreshToken)
-                return halt(401, "refreshtoken cannot be used for API-Calls")
+    if(token.isCalDavToken && controller.simpleName != "CaldavController")
+        return halt(401, "caldav token is not useable for other webservice methods")
 
-            if(System.currentTimeMillis() > token.validTo ){
-                return halt(401, "Token not valid")
-            }
-            val (status, user) = Unirest.get("${config.dbServiceEndpoint}/users/${token.userId}").toModel(User::class.java)
+    if(token.isRefreshToken)
+        return halt(401, "refreshtoken cannot be used for API-Calls")
 
-            var instance = controller.getConstructor(Request::class.java, Response::class.java, User::class.java).newInstance(req, resp, user)
-            var args = mutableListOf<Any>()
-            var bodyParam = method.parameters
-                    .filter { it.isAnnotationPresent(ApiParam::class.java) }
-                    .filter { !it.getAnnotation(ApiParam::class.java).hidden }
-                    .firstOrNull()
-            var badRequest = false
-            if(bodyParam != null) {
-                if(req.body() == null) {
-                    badRequest = true
-                }
-                try {
-                    var bodyObject = jacksonObjectMapper().readValue(req.body(), bodyParam.type)
-                    args.add(bodyObject)
-                } catch (e : Exception) {
-                    badRequest = true
-                }
-            }
-            if(badRequest) {
-                resp.status(400)
-                return jacksonObjectMapper().writeValueAsString(BadRequest())
-            } else {
-                var implicitParams = method.annotations
-                        .filter { it is ApiImplicitParams || it is ApiImplicitParam }
-                        .flatMap {
-                            if (it is ApiImplicitParams)
-                                it.value.toList()
-                            else
-                                listOf(it)
-                        }
-                        .map { it as ApiImplicitParam }
-                        .map { param ->
-                            var value =
-                                    if (param.paramType == "path") {
-                                        req.params(param.name)
-                                    } else {
-                                        req.queryParams(param.name)
-                                    } ?: ""
-                            param to value
-                        }
-                        .filter { it.second != null }
-                        .map(::mapDataTypes)
+    if(System.currentTimeMillis() > token.validTo ){
+        return halt(401, "Token not valid")
+    }
+    val (status, user) = Unirest.get("${config.dbServiceEndpoint}/users/${token.userId}").toModel(User::class.java)
 
-                args.addAll(implicitParams)
-
-                var invokeResult = method.invoke(instance, *args.toTypedArray())
-                if (invokeResult is HttpStatus)
-                    resp.status(invokeResult.code)
-                val producesAnnotation = controller.getAnnotation(Produces::class.java)
-                resp.type(producesAnnotation.value[0])
-                return if(producesAnnotation.value.contains("application/json"))
-                    jacksonObjectMapper().writeValueAsString(invokeResult)
+    var instance = controller.getConstructor(Request::class.java, Response::class.java, User::class.java).newInstance(req, resp, user)
+    var args = mutableListOf<Any>()
+    var bodyParam = method.parameters
+        .filter { it.isAnnotationPresent(ApiParam::class.java) }
+        .filter { !it.getAnnotation(ApiParam::class.java).hidden }
+        .firstOrNull()
+    var badRequest = false
+    if(bodyParam != null) {
+        if(req.body() == null) {
+            badRequest = true
+        }
+        try {
+            var bodyObject = jacksonObjectMapper().readValue(req.body(), bodyParam.type)
+            args.add(bodyObject)
+        } catch (e : Exception) {
+            badRequest = true
+        }
+    }
+    if(badRequest) {
+        resp.status(400)
+        return jacksonObjectMapper().writeValueAsString(BadRequest())
+    } else {
+        var implicitParams = method.annotations
+            .filter { it is ApiImplicitParams || it is ApiImplicitParam }
+            .flatMap {
+                if (it is ApiImplicitParams)
+                    it.value.toList()
                 else
-                    invokeResult
+                    listOf(it)
+            }
+            .map { it as ApiImplicitParam }
+            .map { param ->
+                var value =
+                    if (param.paramType == "path") {
+                        req.params(param.name)
+                    } else {
+                        req.queryParams(param.name)
+                    } ?: ""
+                param to value
+            }
+            .filter { it.second != null }
+            .map(::mapDataTypes)
+
+        args.addAll(implicitParams)
+
+        var invokeResult = try {
+            method.invoke(instance, *args.toTypedArray())
+        } catch (e : Exception) {
+            if(e is HttpStatusException)
+                e.status
+            else if(e.cause is HttpStatusException)
+                (e.cause as HttpStatusException).status
+            else {
+                InternalServerError()
             }
         }
-        else -> BadRequest()
+        if (invokeResult is HttpStatus)
+            resp.status(invokeResult.code)
+        val producesAnnotation = controller.getAnnotation(Produces::class.java)
+        resp.type(producesAnnotation.value[0])
+        return if(producesAnnotation.value.contains("application/json"))
+            jacksonObjectMapper().writeValueAsString(invokeResult)
+        else
+            invokeResult
     }
 }
 
@@ -183,7 +187,7 @@ fun Request.getAuthToken() : String? {
     return authHeader?.replace("Bearer", "")?.trim()
 }
 fun Request.getAuth() : Authentication? {
-    val auth = this.headers("Authorization")
+    val auth = this.headers("Authorization") ?: return null
     return if(auth.startsWith("Basic")) {
         val encoded = String(Base64.getDecoder().decode(auth.replace("Basic", "").trim().toByteArray()))
         val username = encoded.split(":")[0]
