@@ -19,11 +19,10 @@ fun getShortToken(req : Request, resp : Response) : Any? {
         return "Unauthorized"
     } else {
         val tokenString = auth.replace("Bearer", "").trim()
-        val (status, token) = Unirest.get("${config.dbServiceEndpoint}/tokens/$tokenString").toModel(Token::class.java)
+        val (token, status) = DBService.get<Token>(tokenString)
         when(status) {
-            404 -> return halt(401, "Unauthorized")
-            200-> {
-                val token = token as Token
+            null -> {
+                token as Token
                 if(token.isCalDavToken)
                     return halt(401, "caldav token is not useable for other webservice methods")
 
@@ -33,10 +32,12 @@ fun getShortToken(req : Request, resp : Response) : Any? {
                 if(System.currentTimeMillis() > token.validTo ){
                     return halt(401, "Token not valid")
                 }
-
-                var tokens = (Unirest.get("${config.dbServiceEndpoint}/tokens?userId=${token.userId}&caldavToken=false&refreshToken=false&valid=true")
-                        .toModel(Token::class.java).second as List<Token>)
-                        .firstOrNull()
+                val tokens = DBService.all<Token>(
+                    "userId" to token.userId,
+                    "caldavToken" to false,
+                    "refreshToken" to false,
+                    "valid" to true
+                ).maybe?.firstOrNull()
                 if(tokens == null) {
                     val shortToken = Token(UUID.randomUUID().toString().replace("-", ""),
                             token.userId, false, false, System.currentTimeMillis() + config.shortTokenInterval)
@@ -45,7 +46,7 @@ fun getShortToken(req : Request, resp : Response) : Any? {
                             .toModel(Token::class.java)
                     when(status) {
                         200, 201 -> {
-                            val createdToken = (Unirest.get("${config.dbServiceEndpoint}/tokens/${shortToken.token}").toModel(Token::class.java).second as Token)
+                            val createdToken = DBService.get<Token>(shortToken.token).getOrThrow()
                             return createdToken.toJson()
                         }
                         else -> return halt(500, "Internal Server Error")
@@ -53,9 +54,9 @@ fun getShortToken(req : Request, resp : Response) : Any? {
                 }
                 return tokens.toJson()
             }
+            else -> return halt(401, "Unauthorized")
         }
     }
-    return halt(400, BadRequest().toJson())
 }
 fun login(req : Request, resp : Response) : Any? {
     val auth = req.headers("Authorization")
@@ -68,10 +69,7 @@ fun login(req : Request, resp : Response) : Any? {
         val username = encoded.split(":")[0]
         val password = encoded.split(":")[1]
         try {
-            var user = (Unirest.get("${config.dbServiceEndpoint}/users?matriculationNumber=$username")
-                    .toModel(User::class.java)
-                    .second as List<User>)
-                    .firstOrNull()
+            var user = DBService.all<User>("matriculationNumber" to username).maybe?.firstOrNull()
 
             if(user == null)
                 user = loginCampusDual(username, password)
@@ -80,42 +78,37 @@ fun login(req : Request, resp : Response) : Any? {
                 resp.status(401)
                 return "Unauthorized"
             }
-
-            val authResp = Unirest.post("${config.dbServiceEndpoint}/users/${user?.id}/authenticate")
-                    .body(JSONObject("{ \"password\" : \"$password\"}")).asString()
-            when(authResp.status) {
-                in 400..404 -> {
-                    //resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
-                    resp.status(401)
-                    return "Unauthorized"
+            val authenticated = user.authenticate(password)
+            if(authenticated) {
+                val storeHash = req.headers("StoreHash")?.toLowerCase()?.equals("true") ?: false
+                user = modifyHash(user, storeHash, password)
+                //authenticated
+                var token = DBService.all<Token>(
+                    "userId" to user.id,
+                    "caldavToken" to false,
+                    "refreshToken" to true,
+                    "valid" to true
+                ).maybe?.firstOrNull()
+                if(token == null) {
+                    token = Token(UUID.randomUUID().toString().replace("-", ""), user.id,
+                        false, true, System.currentTimeMillis() + config.refreshTokenInterval)
+                    token = DBService.create(token).getOrThrow()
+                    resp.type("application/json")
+                    return token.toJson()
+                } else {
+                    resp.type("application/json")
+                    return token.toJson()
                 }
-                200 -> {
-                    val storeHash = req.headers("StoreHash")?.toLowerCase()?.equals("true") ?: false
-                    user = modifyHash(user, storeHash, password)
-                    //authenticated
-                    var token = (Unirest.get("${config.dbServiceEndpoint}/tokens?userId=${user?.id}&caldavToken=false&refreshToken=true&valid=true")
-                            .toModel(Token::class.java).second as List<Token>)
-                            .firstOrNull()
-                    if(token == null) {
-                        token = Token(UUID.randomUUID().toString().replace("-", ""), user.id,
-                                false, true, System.currentTimeMillis() + config.refreshTokenInterval)
-                        token = (Unirest.put("${config.dbServiceEndpoint}/tokens")
-                                .body(token.toJson())
-                                .toModel(Token::class.java).second as Token)
-                        resp.type("application/json")
-                        return token.toJson()
-                    } else {
-                        resp.type("application/json")
-                        return token.toJson()
-                    }
-                }
+            } else {
+                //resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
+                resp.status(401)
+                return "Unauthorized"
             }
         } catch (e : Exception) {
             e.printStackTrace()
             throw e
         }
     }
-    return ""
 }
 
 fun modifyHash(u : User, storeHash : Boolean, password: String) : User {
@@ -126,13 +119,8 @@ fun modifyHash(u : User, storeHash : Boolean, password: String) : User {
         user.userHash = ""
     else
         user = loginCampusDual(user.matriculationNumber, password)!!
-    val resp = Unirest.post("${config.dbServiceEndpoint}/users/${user.id}")
-            .body(user.toJson())
-            .toModel(User::class.java)
-    return when(resp.first) {
-        in 200..299 -> resp.second as User
-        else -> user
-    }
+    val respUser = DBService.update(user) { it.id }.getOrThrow()
+    return respUser
 }
 fun loginCampusDual(username : String, password : String) : User? {
     val (status, login) = Unirest.get("${config.loginServiceEndpoint}/login")
@@ -141,60 +129,43 @@ fun loginCampusDual(username : String, password : String) : User? {
     if(status == 401 || status == 400)
         return null
     if(login is Login) {
-
-        var uni = (Unirest.get("${config.dbServiceEndpoint}/universities?name=${login.university.encode()}")
-                .toModel(University::class.java).second as List<University>)
-                .firstOrNull()
+        var uni = DBService.all<University>("name" to login.university.encode()).maybe?.firstOrNull()
         if(uni == null) {
             uni = University(0, login.university, "", "")
-            val (status, createUni) = Unirest.put("${config.dbServiceEndpoint}/universities")
-                    .body(uni.toJson())
-                    .toModel(University::class.java)
-            when(status) {
-                200,201 -> {
-                    uni = createUni as University
+            val createUni = DBService.create(uni)
+            when(createUni.error?.code) {
+                null, 200,201 -> {
+                    uni = createUni.maybe
                 }
                 409 -> {
-                    uni = (Unirest.get("${config.dbServiceEndpoint}/universities?name=${login.university}")
-                            .toModel(University::class.java).second as List<University>)
-                            .firstOrNull()
+                    uni = DBService.all<University>("name" to login.university.encode()).maybe?.firstOrNull()
                 }
                 500 -> return null
             }
         }
 
-        var group = (Unirest.get("${config.dbServiceEndpoint}/groups?uid=${login.group}")
-                .toModel(UserGroup::class.java).second as List<UserGroup>)
-                .firstOrNull()
+        var group = DBService.all<UserGroup>("uid" to login.group).maybe?.firstOrNull()
         if(group == null) {
             group = UserGroup(0, login.group, uni!!.id)
-            val (status, createGroup) = Unirest.put("${config.dbServiceEndpoint}/groups")
-                    .body(group.toJson())
-                    .toModel(UserGroup::class.java)
-            when(status) {
-                200,201 -> {
-                    group = createGroup as UserGroup
+            val createGroup = DBService.create(group)
+            when(createGroup.error?.code) {
+                null, 200,201 -> {
+                    group = createGroup.maybe
                 }
                 409 -> {
-                    group = (Unirest.get("${config.dbServiceEndpoint}/groups?uid=${login.group}")
-                            .toModel(UserGroup::class.java).second as List<UserGroup>)
-                            .firstOrNull()
+                    group = DBService.all<UserGroup>("uid" to login.group).maybe?.firstOrNull()
                 }
                 500 -> return null
             }
         }
         var user = User(0, username, login.hash, password, group!!.id, 0, 0)
-        var (status, createUser) = Unirest.put("${config.dbServiceEndpoint}/users")
-                .body(user.toJson())
-                .toModel(User::class.java)
-        when(status) {
-            200,201 -> {
-                user = createUser as User
+        val createUser = DBService.create(user)
+        when(createUser.error?.code) {
+            null, 200,201 -> {
+                user = createUser.maybe!!
             }
             409 -> {
-                user  = (Unirest.get("${config.dbServiceEndpoint}/users?matriculationNumber=$username")
-                        .toModel(User::class.java).second as List<User>)
-                        .first()
+                user = DBService.all<User>("matriculationNumber" to username).maybe?.firstOrNull()!!
                 user.userHash = login.hash
             }
             500 -> return null
