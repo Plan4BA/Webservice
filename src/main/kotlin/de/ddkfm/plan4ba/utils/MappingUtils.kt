@@ -7,9 +7,8 @@ import com.mashape.unirest.request.HttpRequestWithBody
 import com.mashape.unirest.request.body.RequestBodyEntity
 import de.ddkfm.plan4ba.jacksonObjectMapper
 import de.ddkfm.plan4ba.models.HttpStatus
-import io.swagger.annotations.ApiImplicitParam
 import org.json.JSONObject
-import spark.utils.IOUtils
+import java.lang.reflect.Parameter
 import java.net.URLEncoder
 import java.time.Instant
 import java.time.LocalDateTime
@@ -17,20 +16,21 @@ import java.time.ZoneId
 import java.util.*
 
 
-fun mapDataTypes(pair : Pair<ApiImplicitParam, String>) : Any {
-    val returnValue = when(pair.first.dataType.toLowerCase()) {
-        "integer" -> pair.second.toIntOrNull()
-        "long" -> pair.second.toLongOrNull()
-        "boolean" -> pair.second.toBoolean()
-        "double" -> pair.second.toDoubleOrNull()
+fun mapDataTypes(pair : Pair<Parameter, String>) : Any {
+    val returnValue = when(pair.first.type) {
+        Int::class.java-> pair.second.toIntOrNull()
+        Long::class.java -> pair.second.toLongOrNull()
+        Boolean::class.java -> pair.second.toBoolean()
+        Double::class.java -> pair.second.toDoubleOrNull()
         else -> pair.second
     }
-    return returnValue ?: getDefaultValue(pair.first.dataType.toLowerCase())
+    return returnValue ?: getDefaultValue(pair.first.type)
 }
 
-fun getDefaultValue(type : String) : Any {
+fun getDefaultValue(type : Class<*>) : Any {
     return when(type) {
-        "integer", "long", "double" -> -1
+        Int::class.java, Long::class.java, Double::class.java -> -1
+        Boolean::class.java -> false
         else -> ""
     }
 }

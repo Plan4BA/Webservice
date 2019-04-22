@@ -5,14 +5,9 @@ import biweekly.ICalendar
 import biweekly.component.VEvent
 import biweekly.property.Image
 import biweekly.util.Duration
-import com.mashape.unirest.http.Unirest
 import de.ddkfm.plan4ba.models.*
+import de.ddkfm.plan4ba.utils.CaldavToken
 import de.ddkfm.plan4ba.utils.DBService
-import de.ddkfm.plan4ba.utils.toModel
-import io.swagger.annotations.Api
-import io.swagger.annotations.ApiOperation
-import io.swagger.annotations.ApiResponse
-import io.swagger.annotations.ApiResponses
 import spark.Request
 import spark.Response
 import java.util.*
@@ -20,16 +15,12 @@ import javax.ws.rs.GET
 import javax.ws.rs.Path
 import javax.ws.rs.Produces
 
-@Api(value = "/caldav", description = "return all lectures in caldav-format")
 @Path("/caldav")
 @Produces("text/calendar")
+@CaldavToken
 class CaldavController(req : Request, resp : Response, user : User) : ControllerInterface(req = req, resp = resp, user = user) {
 
     @GET
-    @ApiOperation(value = "get caldav lectures")
-    @ApiResponses(
-            ApiResponse(code = 200, message = "successfull")
-    )
     @Path("/lectures")
     fun getCalDav(): String {
         try {
@@ -69,10 +60,6 @@ class CaldavController(req : Request, resp : Response, user : User) : Controller
     }
 
     @GET
-    @ApiOperation(value = "get meals as caldav resource")
-    @ApiResponses(
-            ApiResponse(code = 200, message = "successfull")
-    )
     @Path("/meals")
     fun getMeals(): String {
         try {
@@ -107,10 +94,6 @@ class CaldavController(req : Request, resp : Response, user : User) : Controller
     }
 
     @GET
-    @ApiOperation(value = "get lectures and meals as caldav resource")
-    @ApiResponses(
-            ApiResponse(code = 200, message = "successfull")
-    )
     @Path("/all")
     fun getAll(): String {
         val caldavController = CaldavController(req, resp, user)
