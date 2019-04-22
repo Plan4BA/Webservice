@@ -2,10 +2,7 @@ package de.ddkfm.plan4ba.controller
 
 import com.mashape.unirest.http.Unirest
 import de.ddkfm.plan4ba.models.*
-import de.ddkfm.plan4ba.utils.RequestLimiter
-import de.ddkfm.plan4ba.utils.loginCampusDual
-import de.ddkfm.plan4ba.utils.toModel
-import de.ddkfm.plan4ba.utils.triggerCaching
+import de.ddkfm.plan4ba.utils.*
 import io.swagger.annotations.*
 import org.json.JSONObject
 import spark.Request
@@ -27,11 +24,8 @@ class LectureController(req : Request, resp : Response, user : User) : Controlle
             ApiResponse(code = 200, message = "successfull", response = Lecture::class, responseContainer = "List")
     )
     @Path("")
-    fun getUserLectures(): Any? {
-        val lectures = Unirest.get("${config.dbServiceEndpoint}/lectures?userId=${user.id}")
-                .asJson()
-                .body.array
-                .map { (it as JSONObject).toModel(Lecture::class.java) }
+    fun getUserLectures(): List<Lecture>? {
+        val lectures = DBService.all<Lecture>("userId" to user.id).maybe
         return lectures
     }
 
@@ -42,22 +36,28 @@ class LectureController(req : Request, resp : Response, user : User) : Controlle
             ApiResponse(code = 401, message = "Unauthorized")
     )
     @Path("/trigger")
-    fun trigger() : Any? {
+    fun trigger() : OK {
         if(RequestLimiter.hasLock(user))
-            return BadRequest("locked")
-        RequestLimiter.addLock(user)
+            throw BadRequest("locked").asException()
+        val disableLocking = System.getenv("DISABLE_LOCKING")?.equals("true", true) ?: false
+        if(!disableLocking)//if DISABLE_LOCKING is set, disable the RequestLimiter
+            RequestLimiter.addLock(user)
         if(user.userHash.isNullOrEmpty()) {
             val auth = req.headers("Authorization")
             if (auth == null || !auth.startsWith("Basic ")) {
                 //resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
                 resp.status(401)
-                return Unauthorized("Hash not stored. Basic Authentication is required")
+                throw Unauthorized("Hash not stored. Basic Authentication is required").asException()
             } else {
                 val encoded = String(Base64.getDecoder().decode(auth.replace("Basic", "").trim().toByteArray()))
                 val username = encoded.split(":")[0]
                 val password = encoded.split(":")[1]
                 //login will also trigger the Caching
-                loginCampusDual(username, password)
+                val loginUser = loginCampusDual(username, password)
+                if(loginUser == null || loginUser.userHash.isNullOrEmpty())
+                    throw Unauthorized("Login and Password are not correct").asException()
+                val hash = user.userHash
+                triggerCaching(user, hash!!)
                 return OK()
             }
         } else {

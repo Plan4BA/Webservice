@@ -2,10 +2,7 @@ package de.ddkfm.plan4ba.controller
 
 import com.mashape.unirest.http.Unirest
 import de.ddkfm.plan4ba.models.*
-import de.ddkfm.plan4ba.utils.loginCampusDual
-import de.ddkfm.plan4ba.utils.toJson
-import de.ddkfm.plan4ba.utils.toModel
-import de.ddkfm.plan4ba.utils.triggerCaching
+import de.ddkfm.plan4ba.utils.*
 import io.swagger.annotations.*
 import org.json.JSONObject
 import spark.Request
@@ -28,14 +25,9 @@ class UserController(req : Request, resp : Response, user : User) : ControllerIn
             ApiResponse(code = 200, message = "successfull", response = UserInfo::class)
     )
     @Path("")
-    fun getUserInfo(): Any? {
-        val group = Unirest
-                .get("${config.dbServiceEndpoint}/groups/${user.groupId}")
-                .toModel(UserGroup::class.java)
-                .second as UserGroup
-        val university = Unirest.get("${config.dbServiceEndpoint}/universities/${group.universityId}")
-                .toModel(University::class.java)
-                .second as University
+    fun getUserInfo(): UserInfo {
+        val group = DBService.get<UserGroup>(user.groupId).getOrThrow()
+        val university = DBService.get<University>(group.universityId).getOrThrow()
         return UserInfo(user.matriculationNumber, group.uid, university.name, !user.userHash.isNullOrEmpty(),
                 user.lastLecturePolling, user.lastLectureCall)
     }
@@ -46,19 +38,16 @@ class UserController(req : Request, resp : Response, user : User) : ControllerIn
             ApiResponse(code = 200, message = "successfull", response = Token::class)
     )
     @Path("/caldavToken")
-    fun getCaldavToken(): Any? {
-        val tokens = Unirest.get("${config.dbServiceEndpoint}/tokens?userId=${user.id}&caldavToken=true")
-                .asJson().body.array.map { (it as JSONObject).toModel(Token::class.java) }
-        val caldavToken = tokens.firstOrNull()
+    fun getCaldavToken(): Token {
+        val tokens = DBService.all<Token>("userId" to user.id, "caldavToken" to true).maybe
+        val caldavToken = tokens?.firstOrNull()
         return if(caldavToken == null) {
             val token = Token(UUID.randomUUID().toString().replace("-", ""),
                     user.id, true, false, (System.currentTimeMillis() + 365 * 24 * 3600 * 1000L));
-            val (status, tokenResp) = Unirest.put("${config.dbServiceEndpoint}/tokens")
-                    .body(token.toJson())
-                    .toModel(Token::class.java)
-            when(status) {
-                200, 201 -> token
-                else -> BadRequest()
+            val createdToken = DBService.create(token)
+            when(createdToken.error) {
+                null-> createdToken.maybe!!
+                else -> throw BadRequest().asException()
             }
         } else {
             caldavToken
@@ -72,12 +61,10 @@ class UserController(req : Request, resp : Response, user : User) : ControllerIn
             ApiResponse(code = 401, message = "Unauthorized")
     )
     @Path("/delete")
-    fun delete() : Any? {
+    fun delete() : OK {
         val auth = req.headers("Authorization")
         return if (auth == null || !auth.startsWith("Basic ")) {
-            //resp.header("WWW-Authenticate", "Basic realm=\"Anmeldung wird benötigt\"")
-            resp.status(401)
-            "Unauthorized"
+            throw Unauthorized().asException()
         } else {
             val encoded = String(Base64.getDecoder().decode(auth.replace("Basic", "").trim().toByteArray()))
             val username = encoded.split(":")[0]
@@ -88,7 +75,7 @@ class UserController(req : Request, resp : Response, user : User) : ControllerIn
             if(deleteResp.status == 200)
                 OK()
             else
-                Unauthorized()
+                throw Unauthorized().asException()
         }
     }
 

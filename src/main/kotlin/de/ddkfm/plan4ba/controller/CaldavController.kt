@@ -7,6 +7,7 @@ import biweekly.property.Image
 import biweekly.util.Duration
 import com.mashape.unirest.http.Unirest
 import de.ddkfm.plan4ba.models.*
+import de.ddkfm.plan4ba.utils.DBService
 import de.ddkfm.plan4ba.utils.toModel
 import io.swagger.annotations.Api
 import io.swagger.annotations.ApiOperation
@@ -30,22 +31,15 @@ class CaldavController(req : Request, resp : Response, user : User) : Controller
             ApiResponse(code = 200, message = "successfull")
     )
     @Path("/lectures")
-    fun getCalDav(): Any? {
+    fun getCalDav(): String {
         try {
             val lectureController = LectureController(req, resp, user)
             val lectures = lectureController.getUserLectures() as List<Lecture>
             val calendar = ICalendar()
-            val group = Unirest
-                    .get("${config.dbServiceEndpoint}/groups/${user.groupId}")
-                    .toModel(UserGroup::class.java)
-                    .second as UserGroup
-            val university = Unirest.get("${config.dbServiceEndpoint}/universities/${group.universityId}")
-                    .toModel(University::class.java)
-                    .second as University
-
-            val geoLocation = Unirest.get("${config.dbServiceEndpoint}/universities/${university.id}/location")
-                    .asJson().body.`object`.toModel(Geo::class.java)
-
+            val group = DBService.get<UserGroup>(user.groupId).maybe
+                ?: throw InternalServerError("group can not be found").asException()
+            val university = DBService.get<University>(group.universityId).maybe
+                ?: throw InternalServerError("university can not be found").asException()
             val events = lectures.map { lecture ->
                 val event = VEvent()
                 val summary = event.setSummary(lecture.description)
@@ -61,7 +55,6 @@ class CaldavController(req : Request, resp : Response, user : User) : Controller
                 }
                 event.setDescription(description)
 
-                event.geo = biweekly.property.Geo(geoLocation.latitude, geoLocation.longitude)
                 val image = Image("image/png", university.logoUrl)
                 event.addImage(image)
                 event
@@ -81,21 +74,15 @@ class CaldavController(req : Request, resp : Response, user : User) : Controller
             ApiResponse(code = 200, message = "successfull")
     )
     @Path("/meals")
-    fun getMeals(): Any? {
+    fun getMeals(): String {
         try {
             val mealController = MealController(req, resp, user)
             val meals = mealController.getMeals() as List<Meal>
             val calendar = ICalendar()
-            val group = Unirest
-                    .get("${config.dbServiceEndpoint}/groups/${user.groupId}")
-                    .toModel(UserGroup::class.java)
-                    .second as UserGroup
-            val university = Unirest.get("${config.dbServiceEndpoint}/universities/${group.universityId}")
-                    .toModel(University::class.java)
-                    .second as University
-
-            val geoLocation = Unirest.get("${config.dbServiceEndpoint}/universities/${university.id}/location")
-                    .asJson().body.`object`.toModel(Geo::class.java)
+            val group = DBService.get<UserGroup>(user.groupId).maybe
+                ?: throw InternalServerError("group can not be found").asException()
+            val university = DBService.get<University>(group.universityId).maybe
+                ?: throw InternalServerError("university can not be found").asException()
 
             val events = meals.map { meal ->
                 val dailyEvents = meal.meals.map { food ->
@@ -107,8 +94,6 @@ class CaldavController(req : Request, resp : Response, user : User) : Controller
                     event.setLocation(university.name)
                     val description = "${food.description}\n ${food.prices} \n ${food.additionalInformation}"
                     event.setDescription(description)
-
-                    event.geo = biweekly.property.Geo(geoLocation.latitude, geoLocation.longitude)
                     event
                 }
                 dailyEvents
@@ -127,10 +112,10 @@ class CaldavController(req : Request, resp : Response, user : User) : Controller
             ApiResponse(code = 200, message = "successfull")
     )
     @Path("/all")
-    fun getAll(): Any? {
+    fun getAll(): String {
         val caldavController = CaldavController(req, resp, user)
-        val mealsCalStr = caldavController.getMeals() as String
-        val lectureCalStr = caldavController.getCalDav() as String
+        val mealsCalStr = caldavController.getMeals()
+        val lectureCalStr = caldavController.getCalDav()
 
         val lectureCal = Biweekly.parse(mealsCalStr).first()
         val mealsCal = Biweekly.parse(lectureCalStr).first()

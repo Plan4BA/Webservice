@@ -2,6 +2,7 @@ package de.ddkfm.plan4ba.controller
 
 import com.mashape.unirest.http.Unirest
 import de.ddkfm.plan4ba.models.*
+import de.ddkfm.plan4ba.utils.DBService
 import de.ddkfm.plan4ba.utils.toJson
 import de.ddkfm.plan4ba.utils.toModel
 import io.swagger.annotations.*
@@ -25,14 +26,9 @@ class UniversityController(req : Request, resp : Response, user : User) : Contro
             ApiResponse(code = 200, message = "successfull", response = UniversityInfo::class)
     )
     @Path("")
-    fun getUniversistyInfo(): Any? {
-        val group = Unirest
-                .get("${config.dbServiceEndpoint}/groups/${user.groupId}")
-                .toModel(UserGroup::class.java)
-                .second as UserGroup
-        val university = Unirest.get("${config.dbServiceEndpoint}/universities/${group.universityId}")
-                .toModel(University::class.java)
-                .second as University
+    fun getUniversistyInfo(): UniversityInfo {
+        val group = DBService.get<UserGroup>(user.groupId).getOrThrow()
+        val university = DBService.get<University>(group.universityId).getOrThrow()
         return UniversityInfo(university.name, university.accentColor, university.logoUrl)
     }
 }
