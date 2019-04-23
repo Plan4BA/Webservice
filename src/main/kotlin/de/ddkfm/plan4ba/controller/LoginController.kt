@@ -10,8 +10,7 @@ import javax.ws.rs.GET
 import javax.ws.rs.Path
 
 @Path("/login")
-@BasicAuth
-class LoginController(val req : Request, val resp : Response, user : User) {
+class LoginController(val req : Request, val resp : Response) {
 
     @GET
     @Path("")

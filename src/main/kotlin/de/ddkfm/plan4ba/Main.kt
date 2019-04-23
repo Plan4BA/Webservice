@@ -48,7 +48,7 @@ fun main(args : Array<String>) {
         response.body(jacksonObjectMapper().writeValueAsString(InternalServerError()))
     }
     after(SparkUtils.ALL_PATHS) { request, response ->
-        request.headers("Accept-Encoding")?.equals("gzip")?.run {
+        request.headers("Accept-Encoding")?.contains("gzip")?.run {
             response.header("Content-Encoding", "gzip")
         }
     }
@@ -70,7 +70,7 @@ fun invokeFunction(controller : Class<*>, method : Method, req : Request, resp :
                 val password = auth.password
                 val loginUser = DBService.all<User>("matriculationNumber" to username)
                     .maybe
-                    ?.first()
+                    ?.firstOrNull()
                     ?: continue@loop
                 val authResp = Unirest.post("${config.dbServiceEndpoint}/users/${loginUser.id}/authenticate")
                     .body(JSONObject("{ \"password\" : \"${password}\"}")).asString()

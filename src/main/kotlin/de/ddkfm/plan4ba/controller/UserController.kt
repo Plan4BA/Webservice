@@ -2,6 +2,7 @@ package de.ddkfm.plan4ba.controller
 
 import kong.unirest.Unirest
 import de.ddkfm.plan4ba.models.*
+import de.ddkfm.plan4ba.utils.BasicAuth
 import de.ddkfm.plan4ba.utils.DBService
 import de.ddkfm.plan4ba.utils.ShortToken
 import spark.Request
@@ -46,6 +47,7 @@ class UserController(req : Request, resp : Response, user : User) : ControllerIn
 
     @DELETE
     @Path("/delete")
+    @BasicAuth
     fun delete() : OK {
         val auth = req.headers("Authorization")
         return if (auth == null || !auth.startsWith("Basic ")) {
