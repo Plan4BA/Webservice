@@ -1,4 +1,4 @@
-FROM library/openjdk:10-jre
+FROM library/openjdk:12
 ARG WEBSERVICE_VERSION=1.7
 
 COPY target/Webservice-${WEBSERVICE_VERSION}-jar-with-dependencies.jar /app/Webservice.jar
