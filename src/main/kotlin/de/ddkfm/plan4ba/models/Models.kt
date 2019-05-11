@@ -6,7 +6,9 @@ data class UserInfo(
         var university : String,
         var hashStored : Boolean,
         var lastLecturePolling : Long,
-        var lastLectureCall : Long
+        var lastLectureCall : Long,
+        var storeExamsStats : Boolean,
+        var storeReminders : Boolean
 )
 
 data class UniversityInfo(
@@ -40,13 +42,16 @@ data class SimpleInfotext(
         var language : String
 )
 
+enum class NotificationType(val value : String) {
+    LECTURE_CHANGE("lectureChanged"),
+    APP_CHANGE("appChanged")
+}
 data class SimpleNotification(
         var id : Int,
         var label : String,
         var description : String,
-        var type : String
-        /*var viewed : Boolean,
-        var data : NotificationData?*/
+        var type : String,
+        var callback : String
 )
 
 data class SimpleLink(
@@ -54,4 +59,31 @@ data class SimpleLink(
         var label : String,
         var url : String,
         var language : String
+)
+data class SimpleLectureChange(
+    var id : Int,
+    var notificationId : Int,
+    var old : Lecture?,
+    var new : Lecture?
+)
+
+data class SimpleAppVersion(
+    var id : Int,
+    var version : String,
+    var timestamp : Long,
+    var changes : List<SimpleAppChange>
+)
+
+data class SimpleAppChange(
+    var id : Int,
+    var description: String,
+    var path : String
+)
+
+data class SimpleReminder(
+    var semester : Int,
+    var exams: Int,
+    var electives : Int,
+    var latest : List<LatestExamResult>,
+    var upcoming : List<Upcoming>
 )
