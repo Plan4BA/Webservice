@@ -18,6 +18,7 @@ class LectureController(req : Request, resp : Response, user : User) : Controlle
     @Path("")
     fun getUserLectures(): List<Lecture>? {
         val lectures = DBService.all<Lecture>("userId" to user.id).maybe
+            ?.filter { !it.deprecated }
         return lectures
     }
 
