@@ -24,7 +24,7 @@ class UserController(req : Request, resp : Response, user : User) : ControllerIn
         val group = DBService.get<UserGroup>(user.groupId).getOrThrow()
         val university = DBService.get<University>(group.universityId).getOrThrow()
         return UserInfo(user.matriculationNumber, group.uid, university.name, !user.userHash.isNullOrEmpty(),
-                user.lastLecturePolling, user.lastLectureCall)
+                user.lastLecturePolling, user.lastLectureCall, user.storeExamsStats, user.storeReminders)
     }
 
     @GET
