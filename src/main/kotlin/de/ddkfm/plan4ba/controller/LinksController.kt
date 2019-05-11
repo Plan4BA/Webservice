@@ -23,7 +23,7 @@ class LinksController(req : Request, resp : Response, user : User) : ControllerI
     @Path("")
     fun getUniversityLinks(@QueryParam("language") language : String): List<SimpleLink> {
         val actualLanguage = if(language.isEmpty()) "de" else language
-        val caldavToken = UserController(req, resp,user).getCaldavToken() as Token
+        val caldavToken = UserController(req, resp,user).getCaldavToken()
         val userLinks = (Unirest.get("${config.dbServiceEndpoint}/users/${user.id}/links")
             .toModel(Link::class.java)
             .second as List<Link>)
