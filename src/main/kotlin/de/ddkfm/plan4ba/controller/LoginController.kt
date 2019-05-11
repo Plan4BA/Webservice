@@ -37,7 +37,9 @@ class LoginController(val req : Request, val resp : Response) {
                 val authenticated = user.authenticate(password)
                 if(authenticated) {
                     val storeHash = req.headers("StoreHash")?.toLowerCase()?.equals("true") ?: false
-                    user = AuthService.modifyHash(user, storeHash, password)
+                    val storeReminders = req.headers("StoreReminders")?.toLowerCase()?.equals("true") ?: false
+                    val storeExamStats = req.headers("StoreExamStats")?.toLowerCase()?.equals("true") ?:false
+                    user = AuthService.modifyHash(user, storeHash, storeReminders, storeExamStats, password)
                     //authenticated
                     var token = DBService.all<Token>(
                         "userId" to user.id,
