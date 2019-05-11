@@ -1,5 +1,5 @@
 FROM library/openjdk:12
-ARG WEBSERVICE_VERSION=1.7
+ARG WEBSERVICE_VERSION=2.0
 
 COPY target/Webservice-${WEBSERVICE_VERSION}-jar-with-dependencies.jar /app/Webservice.jar
 WORKDIR /app
