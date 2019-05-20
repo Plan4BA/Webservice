@@ -67,19 +67,6 @@ data class SimpleLectureChange(
     var new : Lecture?
 )
 
-data class SimpleAppVersion(
-    var id : Int,
-    var version : String,
-    var timestamp : Long,
-    var changes : List<SimpleAppChange>
-)
-
-data class SimpleAppChange(
-    var id : Int,
-    var description: String,
-    var path : String
-)
-
 data class SimpleReminder(
     var semester : Int,
     var exams: Int,

@@ -19,50 +19,17 @@ class VersionController(req : Request, resp : Response, user : User) : Controlle
 
     @GET
     @Path("")
-    fun getAllVersions() : List<SimpleAppVersion> {
+    fun getAllVersions() : List<AppVersion> {
         val versions = DBService.all<AppVersion>().maybe ?: emptyList()
-        val simpleVersions = versions.map {version ->
-            val changes = Unirest.get("${config.dbServiceEndpoint}/app/${version.id}/changes")
-                .asString()?.body?.toListModel<AppChange>()
-                ?: emptyList()
-            val simpleVersion = SimpleAppVersion(
-                id = version.id,
-                version = version.version,
-                timestamp = version.timestamp,
-                changes = changes.map { change ->
-                    SimpleAppChange(
-                        id = change.id,
-                        description = change.description,
-                        path = change.path
-                    )
-                }
-            )
-            simpleVersion
-        }
-        return simpleVersions
+        return versions
     }
 
     @GET
     @Path("/:versionId")
-    fun getVersion(@PathParam("versionId") versionId: Int): SimpleAppVersion {
+    fun getVersion(@PathParam("versionId") versionId: Int): AppVersion {
         val version = DBService.get<AppVersion>(versionId).maybe
             ?: throw NotFound("version not found").asException()
-        val changes = Unirest.get("${config.dbServiceEndpoint}/app/${version.id}/changes")
-            .asString()?.body?.toListModel<AppChange>()
-            ?: emptyList()
-        val simpleVersion = SimpleAppVersion(
-            id = version.id,
-            version = version.version,
-            timestamp = version.timestamp,
-            changes = changes.map { change ->
-                SimpleAppChange(
-                    id = change.id,
-                    description = change.description,
-                    path = change.path
-                )
-            }
-        )
-        return simpleVersion
+        return version
     }
 
 }

@@ -139,14 +139,8 @@ data class ExamStat(
 data class AppVersion(
     var id : Int,
     var version : String,
-    var timestamp : Long
-)
-
-data class AppChange(
-    var id : Int,
-    var appVersion : Int,
-    var description: String,
-    var path : String
+    var timestamp : Long,
+    var description : String
 )
 
 data class LatestExamResult(
