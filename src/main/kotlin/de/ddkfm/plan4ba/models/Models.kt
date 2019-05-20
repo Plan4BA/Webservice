@@ -51,7 +51,8 @@ data class SimpleNotification(
         var label : String,
         var description : String,
         var type : String,
-        var callback : String
+        var callback : String,
+        var timestamp : Long
 )
 
 data class SimpleLink(

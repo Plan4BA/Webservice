@@ -42,7 +42,8 @@ class NotificationController(req : Request, resp : Response, user : User) : Cont
                 label = translation.label,
                 description = translation.description,
                 type = notification.type,
-                callback = callback
+                callback = callback,
+                timestamp = notification.timestamp
             )
             simpleNotification
         }
